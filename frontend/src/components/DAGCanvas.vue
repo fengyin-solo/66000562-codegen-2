@@ -9,7 +9,10 @@ const store = useDAGStore()
 const cvs = ref<HTMLCanvasElement>()
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: '#4a5568', RUNNING: '#3182ce', SUCCESS: '#38a169', FAILED: '#e53e3e', TIMEOUT: '#d69e2e'
+  PENDING: '#4a5568', RUNNING: '#3182ce', SUCCESS: '#38a169', FAILED: '#e53e3e', TIMEOUT: '#d69e2e', BLOCKED: '#f59e0b'
+}
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: '待执行', RUNNING: '执行中', SUCCESS: '已完成', FAILED: '失败', TIMEOUT: '超时', BLOCKED: '阻塞'
 }
 
 function draw() {
@@ -57,9 +60,13 @@ function draw() {
     }
 
     // Node box
-    const rw = 120, rh = 44, rx = x - rw/2, ry = y - rh/2
+    const rw = 120, rh = 56, rx = x - rw/2, ry = y - rh/2
+    if (n.blockedByCycle) {
+      ctx.setLineDash([4, 3])
+    }
     ctx.fillStyle = '#1a1a2e'; ctx.strokeStyle = color; ctx.lineWidth = 2
     ctx.beginPath(); roundRect(ctx, rx, ry, rw, rh, 6); ctx.fill(); ctx.stroke()
+    ctx.setLineDash([])
     ctx.shadowBlur = 0
 
     // Status bar at top
@@ -70,8 +77,14 @@ function draw() {
     ctx.fillStyle = '#e0e0e0'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'
     ctx.fillText(n.name, x, y - 2)
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'
-    ctx.fillText(`${n.status} | 重试${n.retries}`, x, y + 14)
+    ctx.fillText(`${STATUS_LABELS[n.status] || n.status} | 优先级${n.priority ?? 3} | 重试${n.retries}`, x, y + 14)
     ctx.textAlign = 'start'
+
+    if (n.blockedByCycle) {
+      ctx.font = '8px system-ui'; ctx.fillStyle = '#f59e0b'; ctx.textAlign = 'center'
+      ctx.fillText('循环依赖', x, y + 26)
+      ctx.textAlign = 'start'
+    }
 
     // Duration
     if (n.startTime && n.endTime) {

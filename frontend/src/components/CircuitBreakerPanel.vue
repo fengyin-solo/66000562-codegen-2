@@ -3,7 +3,7 @@
     <h4>⚡ 熔断器状态</h4>
     <div v-for="cb in breakers" :key="cb.taskId" class="cb-row" :class="cb.state.toLowerCase()">
       <span class="cb-task">{{ cb.taskId }}</span>
-      <span class="cb-state">{{ cb.state }}</span>
+      <span class="cb-state">{{ stateText(cb.state) }}</span>
       <span class="cb-count">{{ cb.failureCount }} 次失败</span>
     </div>
     <div v-if="!breakers.length" class="empty">无熔断保护激活</div>
@@ -13,8 +13,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useDAGStore } from '../store/dag'
+
 const store = useDAGStore()
 const breakers = computed(() => store.execution?.circuitBreakers || [])
+const labels: Record<string, string> = { OPEN: '熔断打开', CLOSED: '正常闭合', HALF_OPEN: '半开探测' }
+function stateText(state: string) {
+  return labels[state] || state
+}
 </script>
 <style scoped>
 .panel{background:#1a1a2e;border-radius:8px;padding:10px;border:1px solid #2a2a4a}
