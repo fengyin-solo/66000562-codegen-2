@@ -9,7 +9,12 @@ const store = useDAGStore()
 const cvs = ref<HTMLCanvasElement>()
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: '#4a5568', RUNNING: '#3182ce', SUCCESS: '#38a169', FAILED: '#e53e3e', TIMEOUT: '#d69e2e'
+  PENDING: '#4a5568', RUNNING: '#3182ce', SUCCESS: '#38a169',
+  FAILED: '#e53e3e', TIMEOUT: '#d69e2e', BLOCKED: '#d97706'
+}
+const STATUS_TEXT: Record<string, string> = {
+  PENDING: '待执行', RUNNING: '执行中', SUCCESS: '已完成',
+  FAILED: '失败', TIMEOUT: '超时', BLOCKED: '循环等待'
 }
 
 function draw() {
@@ -23,22 +28,27 @@ function draw() {
   const nodes = wf.nodes
   const nodePos: Record<string, {x:number, y:number}> = {}
   nodes.forEach(n => { nodePos[n.id] = { x: 80 + n.x * 80, y: 60 + n.y * 80 } })
+  const cyclic = new Set(wf.cycleNodeIds || [])
 
   // Draw edges
   wf.edges.forEach(([u, v]) => {
     const a = nodePos[u], b = nodePos[v]
     if (!a || !b) return
-    ctx.strokeStyle = '#2a2a4a'; ctx.lineWidth = 2
+    const onCycle = cyclic.has(u) && cyclic.has(v)
+    ctx.strokeStyle = onCycle ? '#d97706' : '#2a2a4a'
+    ctx.lineWidth = onCycle ? 3 : 2
+    ctx.setLineDash(onCycle ? [6, 4] : [])
     ctx.beginPath(); ctx.moveTo(a.x, a.y)
     // Draw bezier curve
     const mx = (a.x + b.x) / 2
     ctx.bezierCurveTo(mx, a.y, mx, b.y, b.x, b.y)
     ctx.stroke()
+    ctx.setLineDash([])
 
     // Arrow head
     const angle = Math.atan2(b.y - Math.max(a.y, b.y - 20), b.x - a.x)
     const arrowSize = 8
-    ctx.fillStyle = '#2a2a4a'
+    ctx.fillStyle = onCycle ? '#d97706' : '#2a2a4a'
     ctx.beginPath()
     ctx.moveTo(b.x, b.y)
     ctx.lineTo(b.x - arrowSize * Math.cos(angle - 0.5), b.y - arrowSize * Math.sin(angle - 0.5))
@@ -59,7 +69,9 @@ function draw() {
     // Node box
     const rw = 120, rh = 44, rx = x - rw/2, ry = y - rh/2
     ctx.fillStyle = '#1a1a2e'; ctx.strokeStyle = color; ctx.lineWidth = 2
+    ctx.setLineDash(n.status === 'BLOCKED' ? [5, 3] : [])
     ctx.beginPath(); roundRect(ctx, rx, ry, rw, rh, 6); ctx.fill(); ctx.stroke()
+    ctx.setLineDash([])
     ctx.shadowBlur = 0
 
     // Status bar at top
@@ -70,7 +82,8 @@ function draw() {
     ctx.fillStyle = '#e0e0e0'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'
     ctx.fillText(n.name, x, y - 2)
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'
-    ctx.fillText(`${n.status} | 重试${n.retries}`, x, y + 14)
+    const label = STATUS_TEXT[n.status] ?? n.status
+    ctx.fillText(n.status === 'PENDING' || n.status === 'SUCCESS' ? label : `${label} | 重试${n.retries}`, x, y + 14)
     ctx.textAlign = 'start'
 
     // Duration
